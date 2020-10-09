@@ -1,7 +1,10 @@
+declare-option -hidden str plug_source %val{source}
+
 provide-module plug %{
   # Internal variables
   declare-option -docstring 'plug list of modules' str-list plug_modules
-  declare-option -docstring 'plug list of module name and repository pairs' str-list plug_module_to_repository_map
+  declare-option -docstring 'plug list of module name and repository pairs' str-list plug_module_to_repository_map 
+  declare-option -docstring 'plugin installation directory' str plug_plugin_dir %sh{ echo ${kak_opt_plug_source%%/rc*}/plugins }
 
   # Hooks
   hook -group plug-kak-begin global KakBegin .* %{
@@ -20,7 +23,7 @@ provide-module plug %{
 
   define-command plug-core -params 0..1 -docstring 'plug-core [config]' %{
     evaluate-commands %sh{
-      if [ "$kak_config/autoload/core" -ef "$kak_runtime/autoload" ]; then
+      if [ "$kak_opt_plug_plugin_dir/core" -ef "$kak_runtime/autoload" ]; then
         echo 'evaluate-commands %arg{1}'
       fi
     }
@@ -43,7 +46,7 @@ provide-module plug %{
   define-command plug-old -params 2..3 -docstring 'plug-old <module> <repository> [config]' %{
     set-option -add global plug_module_to_repository_map %arg{1} %arg{2}
     evaluate-commands %sh{
-      if [ -d "$kak_config/autoload/$1" ]; then
+      if [ -d "$kak_opt_plug_plugin_dir/$1" ]; then
         echo 'evaluate-commands %arg{3}'
       fi
     }
@@ -57,14 +60,15 @@ provide-module plug %{
 
   define-command plug-install -docstring 'plug-install' %{
     plug-fifo sh -c %{
-      kak_runtime=$1 kak_config=$2; shift 2
+      kak_runtime=$1 kak_opt_plug_plugin_dir=$2; shift 2
       kak_opt_plug_module_to_repository_map=$@
 
+      mkdir -p "$kak_opt_plug_plugin_dir"
+
       # plug-core
-      if ! [ "$kak_config/autoload/core" -ef "$kak_runtime/autoload" ]; then
-        mkdir -p "$kak_config/autoload"
-        unlink "$kak_config/autoload/core"
-        ln -s "$kak_runtime/autoload" "$kak_config/autoload/core"
+      if ! [ "$kak_opt_plug_plugin_dir/core" -ef "$kak_runtime/autoload" ]; then
+        unlink "$kak_opt_plug_plugin_dir/core"
+        ln -s "$kak_runtime/autoload" "$kak_opt_plug_plugin_dir/core"
       fi
 
       # plug
@@ -76,7 +80,7 @@ provide-module plug %{
           continue
         fi
 
-        module_path=$kak_config/autoload/$module
+        module_path=$kak_opt_plug_plugin_dir/$module
 
         # Install
         if ! [ -d "$module_path" ]; then
@@ -88,18 +92,18 @@ provide-module plug %{
 
         fi
       done
-    } -- %val{runtime} %val{config} %opt{plug_module_to_repository_map}
+    } -- %val{runtime} %opt{plug_plugin_dir} %opt{plug_module_to_repository_map}
   }
 
-  define-command plug-execute -params 2.. -shell-script-candidates 'cd "${kak_config}/autoload" && ls -1' -docstring 'plug-execute <module> <command>' %{
+  define-command plug-execute -params 2.. -shell-script-candidates 'cd "$kak_opt_plug_plugin_dir" && ls -1' -docstring 'plug-execute <module> <command>' %{
     plug-fifo sh -c %{
-      kak_config=$1 kak_module=$2; shift 2
+      kak_opt_plug_plugin_dir=$1 kak_module=$2; shift 2
       kak_command=$@
 
       # plug
-      cd "$kak_config/autoload/$module"
+      cd "$kak_opt_plug_plugin_dir/$module"
       "$@"
-    } -- %val{config} %arg{@}
+    } -- %opt{plug_plugin_dir} %arg{@}
   }
 
   define-command plug-upgrade-example -docstring 'plug-upgrade-example' %{
