@@ -167,7 +167,7 @@ provide-module plug %{
     }
   }
 
-  define-command plug-clean -docstring 'plug-clean' %{
+  define-command plug-purge -docstring 'plug-purge' %{
     nop %sh{
       rm -Rf "$kak_opt_plug_autoload_path" "$kak_opt_plug_install_path"
     }
